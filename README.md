@@ -23,6 +23,16 @@ before is ready when you join. Terrain that comes in while you play shows after 
 `chunksmith-bridge/log.txt` tells you what's going on: `connected to Chunksmith`,
 `fetching N far regions`, `N far regions stored`, `added N far chunks from N regions`.
 
+## Network
+
+- On joining any server the mod sends one discovery message on `chunksmith:lod`, before it
+  knows whether the server runs Chunksmith; a server without it ignores the message.
+- Downloads go over the game connection, or over plain HTTP to the address the server names in
+  its answer (usually the same host, Chunksmith's download port; the server may name another
+  host). That host sees your IP address, the dimension and regions asked for, and the download
+  token the server issued.
+- No other hosts, no data collected.
+
 ## Requirements
 
 - Sunrise's far terrain switched on: Options → Graphics → **LOD distance** above 0.

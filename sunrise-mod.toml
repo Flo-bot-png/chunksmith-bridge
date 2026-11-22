@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Shows the distant terrain a Chunksmith server sends (meant for Distant Horizons / voxy) in Sunrise's own far terrain."
 authors = ["Galaxis_Boarder"]
 # A native mod: Rust in src/, compiled by `cargo sunrise-mod build` against the game build [native] pins.
-side = "client"
+side = "both"
 
 [native]
 game = "26.3"

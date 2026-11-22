@@ -167,8 +167,9 @@ fn store(table: &Table, bytes: &[u8], t: &Target, out: &Sender<Event>) -> bool {
     true
 }
 
-/// Bumped when the conversion changes: what an older version wrote is taken out of Sunrise's
-/// files and converted again from the mod's own copies.
+/// Bumped when the conversion changes: every region is converted again from the mod's own
+/// copies. Nothing is deleted: the merge replaces only the chunks this mod wrote (`anvil::OURS`)
+/// and keeps those Sunrise recorded while the player was there.
 const CONVERT_VERSION: &str = "3";
 
 fn upgrade() {
@@ -189,9 +190,6 @@ fn upgrade() {
                 let Some(coords) = name.strip_prefix("r.").and_then(|n| n.strip_suffix(".cslod")) else { continue };
                 let Some((rx, rz)) = coords.split_once('.') else { continue };
                 let (Ok(rx), Ok(rz)) = (rx.parse::<i32>(), rz.parse::<i32>()) else { continue };
-                if let Some(dir) = level_dir(&server_name, &level) {
-                    let _ = fs::remove_file(anvil::region_path(&dir, rx, rz));
-                }
                 let t = Target { server: server_name.clone(), level: level.clone(), wire_dim: wire_dim.clone(), rx, rz, near: false };
                 add_pending(&t, &region.path());
             }
