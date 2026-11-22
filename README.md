@@ -25,8 +25,10 @@ before is ready when you join. Terrain that comes in while you play shows after 
 
 ## Network
 
-- On joining any server the mod sends one discovery message on `chunksmith:lod`, before it
-  knows whether the server runs Chunksmith; a server without it ignores the message.
+- On joining any server, before it knows whether the server runs Chunksmith, the mod registers
+  the `chunksmith:lod` channel (`minecraft:register`) and sends a hello on it: the protocol
+  version, the formats it wants and the download radius from its settings. A server without
+  Chunksmith ignores both, and the mod sends nothing more there.
 - Downloads go over the game connection, or over plain HTTP to the address the server names in
   its answer (usually the same host, Chunksmith's download port; the server may name another
   host). That host sees your IP address, the dimension and regions asked for, and the download

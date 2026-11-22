@@ -52,30 +52,42 @@ fn slot(x: i32, z: i32) -> usize {
 }
 
 /// The chunks a region file holds now: slot → (timestamp, raw sector data incl. length and
-/// compression byte). Unreadable entries are skipped; Sunrise wrote them, so they stay theirs.
-fn existing(path: &Path) -> BTreeMap<usize, (u32, Vec<u8>)> {
+/// compression byte). Only a missing (or empty) file is an empty region: a file that can't be
+/// read whole, or one with a slot that points nowhere sensible, is an error, so the caller
+/// leaves it untouched rather than rewrite it without chunks Sunrise recorded.
+fn existing(path: &Path) -> io::Result<BTreeMap<usize, (u32, Vec<u8>)>> {
     let mut out = BTreeMap::new();
-    let Ok(file) = fs::read(path) else { return out };
+    let file = match fs::read(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(out),
+        Err(e) => return Err(e),
+    };
+    if file.is_empty() {
+        return Ok(out);
+    }
+    let bad = |what: &str, i: usize| io::Error::new(io::ErrorKind::InvalidData, format!("{}: {what} at slot {i}", path.display()));
     if file.len() < SECTOR * 2 {
-        return out;
+        return Err(bad("header cut short", 0));
     }
     for i in 0..1024 {
         let loc = u32::from_be_bytes(file[i * 4..i * 4 + 4].try_into().unwrap());
-        let (start, count) = ((loc >> 8) as usize, (loc & 255) as usize);
-        if start < 2 || count == 0 {
+        if loc == 0 {
             continue;
         }
-        let Some(data) = file.get(start * SECTOR..(start + count) * SECTOR) else { continue };
+        let (start, count) = ((loc >> 8) as usize, (loc & 255) as usize);
+        if start < 2 || count == 0 {
+            return Err(bad("location inside the header", i));
+        }
+        let data = file.get(start * SECTOR..(start + count) * SECTOR).ok_or_else(|| bad("record past the end", i))?;
         let len = u32::from_be_bytes(data[..4].try_into().unwrap()) as usize;
         if len == 0 || len + 4 > data.len() {
-            continue;
+            return Err(bad("record length", i));
         }
         let stamp = u32::from_be_bytes(file[SECTOR + i * 4..SECTOR + i * 4 + 4].try_into().unwrap());
         out.insert(i, (stamp, data[..len + 4].to_vec()));
     }
-    out
+    Ok(out)
 }
-
 
 /// The timestamp this mod gives its chunks in the region header: Sunrise stamps the chunks
 /// the player saw with the time, so a chunk with this one is ours and may be replaced by a
@@ -86,7 +98,7 @@ pub const OURS: u32 = 1;
 /// chunk the player saw (better than what was sent) and replacing what this mod wrote before.
 /// Writes a whole new file beside it and moves it into place. Returns how many chunks changed.
 pub fn merge(path: &Path, records: Vec<((i32, i32), Vec<u8>)>) -> io::Result<usize> {
-    let mut chunks = existing(path);
+    let mut chunks = existing(path)?;
     let stamp = OURS;
     let mut added = 0;
     for ((x, z), compressed) in records {
@@ -149,7 +161,7 @@ mod tests {
         assert_eq!(merge(&path, vec![((-32, 0), record(-32, 0, &[0; 256]))]).unwrap(), 0);
         assert_eq!(merge(&path, vec![((-32, 0), record(-32, 0, &[1; 3]))]).unwrap(), 1);
         assert_eq!(merge(&path, vec![((-31, 5), record(-31, 5, &[0; 256]))]).unwrap(), 1);
-        let kept = existing(&path);
+        let kept = existing(&path).unwrap();
         assert_eq!(kept.len(), 2);
         assert!(kept.contains_key(&0) && kept.contains_key(&(1 + 5 * 32)));
         // A chunk Sunrise stamped (the player saw it) stays.
@@ -157,6 +169,25 @@ mod tests {
         file[SECTOR..SECTOR + 4].copy_from_slice(&1_795_000_000u32.to_be_bytes());
         fs::write(&path, file).unwrap();
         assert_eq!(merge(&path, vec![((-32, 0), record(-32, 0, &[2; 3]))]).unwrap(), 0);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_unreadable_region_is_left_alone() {
+        let dir = std::env::temp_dir().join(format!("csb-anvil-bad-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let path = region_path(&dir, 0, 0);
+        fs::create_dir_all(&dir).unwrap();
+        // A header whose first slot points past the end of the file.
+        let mut file = vec![0u8; SECTOR * 2];
+        file[..4].copy_from_slice(&((9u32 << 8) | 1).to_be_bytes());
+        fs::write(&path, &file).unwrap();
+        assert!(merge(&path, vec![((1, 0), record(1, 0, &[0; 256]))]).is_err());
+        assert_eq!(fs::read(&path).unwrap(), file);
+        // A header cut short.
+        fs::write(&path, [1u8; 100]).unwrap();
+        assert!(merge(&path, vec![((1, 0), record(1, 0, &[0; 256]))]).is_err());
+        assert_eq!(fs::read(&path).unwrap(), [1u8; 100]);
         let _ = fs::remove_dir_all(&dir);
     }
 }
