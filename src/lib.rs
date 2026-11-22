@@ -64,6 +64,8 @@ struct Session {
     inband_queue: Vec<(String, i32, i32, String)>,
     inband_parts: HashMap<(String, i32, i32), Vec<u8>>,
     inband_busy: bool,
+    /// The index's hash of each region asked for in-band, so a stored one is known next time.
+    inband_hash: HashMap<(String, i32, i32), i64>,
     send_said: bool,
     /// Ask the worker to convert waiting regions on the next tick.
     merge_free: bool,
@@ -289,6 +291,7 @@ impl Session {
             inband_queue: Vec::new(),
             inband_parts: HashMap::new(),
             inband_busy: false,
+            inband_hash: HashMap::new(),
             send_said: false,
             merge_free: false,
             in_flight: Default::default(),
@@ -407,6 +410,7 @@ fn handle(host: &mut dyn ClientHost, state: &mut State, data: &[u8]) {
                     }
                 } else {
                     session.inband_queue.push((dim.clone(), x, z, hash.to_string()));
+                    session.inband_hash.insert((dim.clone(), x, z), hash);
                     session.queued += 1;
                 }
             }
@@ -425,7 +429,8 @@ fn handle(host: &mut dyn ClientHost, state: &mut State, data: &[u8]) {
                 let bytes = session.inband_parts.remove(&key).unwrap_or_default();
                 let player_region = player_info(host).map(|(_, p)| p);
                 let at = session.target(&dim, x, z, player_region);
-                let _ = state.jobs.as_ref().map(|j| j.send(Job::Region { bytes, at }));
+                let hash = session.inband_hash.remove(&key).unwrap_or(0);
+                let _ = state.jobs.as_ref().map(|j| j.send(Job::Region { bytes, at, hash }));
             }
         }
         Some(104) => session.inband_busy = false,
@@ -497,9 +502,17 @@ impl State {
         }
         // In-band: a few regions at a time.
         if port == 0 && !session.inband_busy && !session.inband_queue.is_empty() {
-            let batch: Vec<_> = session.inband_queue.drain(..session.inband_queue.len().min(4)).collect();
-            let dim = batch[0].0.clone();
-            let batch: Vec<_> = batch.into_iter().filter(|b| b.0 == dim).collect();
+            // Up to four of the first one's dimension; the others wait their turn.
+            let dim = session.inband_queue[0].0.clone();
+            let mut batch = Vec::new();
+            session.inband_queue.retain(|b| {
+                if batch.len() < 4 && b.0 == dim {
+                    batch.push(b.clone());
+                    false
+                } else {
+                    true
+                }
+            });
             let mut w = Writer::default();
             w.u8(3).utf(&dim).i32(batch.len() as i32);
             for (_, x, z, _) in &batch {

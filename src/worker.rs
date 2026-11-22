@@ -22,7 +22,7 @@ pub enum Job {
     /// Fetch a region over the backchannel.
     Download { source: Source, at: Target },
     /// A region that came in-band, whole.
-    Region { bytes: Vec<u8>, at: Target },
+    Region { bytes: Vec<u8>, at: Target, hash: i64 },
     /// Merge what waited (only while no world is open).
     MergePending,
     /// While playing: merge what waited where Sunrise has no file, away from the player's region.
@@ -290,9 +290,9 @@ pub fn run(jobs: Receiver<Job>, out: Sender<Event>) {
         match job {
             Job::MergePending => merge_pending(&table, &out, None),
             Job::MergeFree { near } => merge_pending(&table, &out, Some(near)),
-            Job::Region { bytes, at } => {
+            Job::Region { bytes, at, hash } => {
                 if store(&table, &bytes, &at, &out) {
-                    let _ = out.send(Event::Stored { wire_dim: at.wire_dim.clone(), rx: at.rx, rz: at.rz, hash: 0 });
+                    let _ = out.send(Event::Stored { wire_dim: at.wire_dim.clone(), rx: at.rx, rz: at.rz, hash });
                 } else {
                     let _ = out.send(Event::Failed { wire_dim: at.wire_dim.clone(), rx: at.rx, rz: at.rz });
                 }
