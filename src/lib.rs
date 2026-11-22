@@ -386,8 +386,14 @@ fn handle(host: &mut dyn ClientHost, state: &mut State, data: &[u8]) {
             let fetch_host = if hello.host.is_empty() { address_host(&session.address) } else { hello.host.clone() };
             let (port, token) = (hello.port, hello.token.clone());
             let mut new = 0;
+            // A region is fetched once. After that it stays as it is (Sunrise updates the parts
+            // you see yourself); only with `refresh=true` is a changed copy fetched again.
+            let refresh = setting("refresh").is_some_and(|v| v == "true");
             for (x, z, hash) in regions {
-                let have = session.known.get(&(dim.clone(), x, z)) == Some(&hash);
+                let have = match session.known.get(&(dim.clone(), x, z)) {
+                    Some(known) => !refresh || *known == hash,
+                    None => false,
+                };
                 let at = session.target(&dim, x, z, player_region);
                 if have && worker::store_path(&at).exists() || session.in_flight.contains(&(dim.clone(), x, z)) {
                     continue;

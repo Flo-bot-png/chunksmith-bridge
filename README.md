@@ -48,11 +48,14 @@ before is ready when you join. Terrain that comes in while you play shows after 
 ```
 radius=8192
 chat=false
+refresh=false
 ```
 
 - `radius`: how far around you to fetch, in blocks (512 to 16384, default 8192). Every region
   of 512×512 blocks takes about 15 MB on disk: 8192 is up to ~12 GB, 16384 up to ~45 GB, if the
   server has that much.
+- `refresh`: `true` downloads a region again when the server's copy changed. By default every
+  region is downloaded once and then kept; the parts you see yourself are updated by Sunrise.
 - `chat`: `true` shows the mod's messages in the chat. They always go to
   `chunksmith-bridge/log.txt`.
 
