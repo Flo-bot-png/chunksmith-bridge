@@ -1,8 +1,9 @@
 id = "chunksmith_bridge"
 name = "Chunksmith Bridge"
-version = "0.1.1"
+version = "0.1.2"
 description = "Shows the distant terrain a Chunksmith server sends (meant for Distant Horizons / voxy) in Sunrise's own far terrain."
 authors = ["Galaxis_Boarder"]
+license = "GPL-3.0-only"
 # A native mod: Rust in src/, compiled by `cargo sunrise-mod build` against the game build [native] pins.
 side = "both"
 
