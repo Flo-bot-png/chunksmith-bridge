@@ -1,6 +1,6 @@
 id = "chunksmith_bridge"
 name = "Chunksmith Bridge"
-version = "0.1.3"
+version = "0.1.4"
 description = "Shows the distant terrain a Chunksmith server sends (meant for Distant Horizons / voxy) in Sunrise's own far terrain."
 authors = ["Galaxis_Boarder"]
 license = "GPL-3.0-only"

@@ -197,7 +197,7 @@ dependencies = [
 
 [[package]]
 name = "mod-chunksmith_bridge"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "flate2",
  "sunrise-mod-api",
