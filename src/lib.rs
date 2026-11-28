@@ -579,7 +579,7 @@ impl Hooks for Mod {
         }
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         if state.inbox.len() < 4096 {
-            state.inbox.push(payload.data.clone());
+            state.inbox.push(payload.data.to_vec());
         }
     }
 
@@ -616,7 +616,8 @@ impl Hooks for Mod {
             .client_session()
             .client_server()
             .and_then(|s| s.address)
-            .filter(|a| !a.is_empty());
+            .filter(|a| !a.is_empty())
+            .map(str::to_owned);
         match address {
             Some(address) if in_world => state.play(host, address),
             _ => {
